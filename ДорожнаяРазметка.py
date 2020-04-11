@@ -8,7 +8,7 @@ if __name__ == '__main__':
     def nothing(*arg):
         pass
 
-cap = cv2.VideoCapture("test_footage.mp4")
+cap = cv2.VideoCapture(2)
 
 cv2.namedWindow("result")  # создаем главное окно  # создаем окно настроек
 cv2.namedWindow("setting2") # создаем окно настроек 2
@@ -21,10 +21,10 @@ cv2.createTrackbar('v1', 'setting2', 155, 255, nothing)
 cv2.createTrackbar('h2', 'setting2', 199, 255, nothing)
 cv2.createTrackbar('s2', 'setting2', 49, 255, nothing)
 cv2.createTrackbar('v2', 'setting2', 255, 255, nothing)
-cv2.createTrackbar('H_Up', 'setting3', 318, 720, nothing)
-cv2.createTrackbar('W_Up', 'setting3', 318, 720, nothing)
-cv2.createTrackbar('H_Down', 'setting3', 720, 720, nothing)
-cv2.createTrackbar('W_Down', 'setting3', 720, 720, nothing)
+cv2.createTrackbar('1H', 'setting3', 291, 720, nothing)
+cv2.createTrackbar('1W', 'setting3', 178, 720, nothing)
+cv2.createTrackbar('2H', 'setting3', 138, 720, nothing)
+cv2.createTrackbar('2W', 'setting3', 577, 720, nothing)
 
 
 crange = [0, 0, 0, 0, 0, 0]
@@ -44,13 +44,13 @@ while cv2.waitKey(1) != 27:
     h2 = cv2.getTrackbarPos('h2', 'setting2')
     s2 = cv2.getTrackbarPos('s2', 'setting2')
     v2 = cv2.getTrackbarPos('v2', 'setting2')
-    poly_height = cv2.getTrackbarPos('H_Up', 'setting3')
-    poly_down = cv2.getTrackbarPos('H_Down', 'setting3')
-    poly_up_width = cv2.getTrackbarPos('W_Up', 'setting3')
-    poly_down_width = cv2.getTrackbarPos('W_Down', 'setting3')
+    poly_height = cv2.getTrackbarPos('1H', 'setting3')
+    poly_down = cv2.getTrackbarPos('2H', 'setting3')
+    poly_up_width = cv2.getTrackbarPos('1W', 'setting3')
+    poly_down_width = cv2.getTrackbarPos('2W', 'setting3')
 
-    polygon = np.float32([[size[0] // 2 - poly_down_width, 720 - poly_down],
-                          [size[0] // 2 + poly_down_width, 720 - poly_down],
+    polygon = np.float32([[size[0] // 2 - poly_down_width // 2, 720 - poly_down],
+                          [size[0] // 2 + poly_down_width // 2, 720 - poly_down],
                           [size[0] // 2 + poly_up_width // 2, size[1] - poly_height],
                           [size[0] // 2 - poly_up_width // 2, size[1] - poly_height]])
     poly_draw = np.array(polygon, dtype=np.int32)
@@ -67,7 +67,7 @@ while cv2.waitKey(1) != 27:
 
     # Меняем размер картинки.
     resized = cv2.resize(frame, (size[1], size[0]))
-    cv2.polylines(resized, [poly_draw], True, (255, 0, 0))
+    cv2.polylines(resized, [poly_draw], True, (0, 0, 255), 3)
 
     # Динамичное редактирование цветогого спектра.
     hsv = cv2.cvtColor(resized, cv2.COLOR_BGR2HSV)
@@ -82,8 +82,6 @@ while cv2.waitKey(1) != 27:
     IndWhitestCoulumnL = np.argmax(histogram[:midpoint])
     IndWhitestCoulumnR = np.argmax(histogram[midpoint:]) + midpoint
     warped_visual = warped.copy()
-    cv2.line(warped_visual, (IndWhitestCoulumnL, 0), (IndWhitestCoulumnL, warped_visual.shape[0]), 110, 2)
-    cv2.line(warped_visual, (IndWhitestCoulumnR, 0), (IndWhitestCoulumnR, warped_visual.shape[0]), 110, 2)
 
     nwindows, window_half = 20, 30
     win_height = np.int(warped.shape[0] / nwindows)
@@ -150,6 +148,8 @@ while cv2.waitKey(1) != 27:
         cv2.circle(out_img, (int(gor_ind), int(ver_ind)), 2, (255, 0, 255), 1)"""
 
     R = cv2.getPerspectiveTransform(dst, polygon)
+    cv2.line(warped, (IndWhitestCoulumnL, 0), (IndWhitestCoulumnL, warped_visual.shape[0]), 355, 3)
+    cv2.line(warped, (IndWhitestCoulumnR, 0), (IndWhitestCoulumnR, warped_visual.shape[0]), 235, 3)
     out_img = cv2.warpPerspective(out_img, R, (size[1], size[0]), flags=cv2.INTER_LINEAR)
     out_img = cv2.resize(out_img, (330, 330))
     resized = cv2.resize(resized, (330, 330))
