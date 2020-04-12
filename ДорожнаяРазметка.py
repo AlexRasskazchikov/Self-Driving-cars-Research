@@ -4,8 +4,14 @@ import sys
 
 size = (720, 720)
 
+
 def nothing(*arg):
     pass
+
+
+def output(information, window, color):
+    cv2.putText(window, information, (40, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 1)
+
 
 cam = 2
 path = "test_footage.mp4"
@@ -38,10 +44,11 @@ cv2.createTrackbar('WW', 'setting3', 30, 50, nothing)  # Ширина окоше
 cv2.createTrackbar('WC', 'setting3', 20, 50, nothing)  # Количество окошек слежения за полосой.
 
 # Crop-слайдеры.
-cv2.createTrackbar('Up', 'crop1', 5, size[1] // 2, nothing)
-cv2.createTrackbar('Down', 'crop1', 5, size[1] // 2, nothing)
+cv2.createTrackbar('Up', 'crop1', 337, size[1] // 2 + 100, nothing)
+cv2.createTrackbar('Down', 'crop1', 86, size[1] // 2, nothing)
 cv2.createTrackbar('Left', 'crop1', 5, size[0] // 2, nothing)
 cv2.createTrackbar('Right', 'crop1', 5, size[0] // 2, nothing)
+cv2.createTrackbar('Save', 'crop1', 50, size[0] // 3, nothing)
 
 crange = [0, 0, 0, 0, 0, 0]
 
@@ -59,8 +66,7 @@ while cv2.waitKey(1) != 27:
         frame_counter = 0
         cap = cv2.VideoCapture(video_name)
 
-
-    # считываем значения бегунков
+    # Cчитываем значения бегунков
 
     #   Threshold слайдеры.
     h1 = cv2.getTrackbarPos('h1', 'setting2')
@@ -82,12 +88,15 @@ while cv2.waitKey(1) != 27:
     down_crop = size[1] - cv2.getTrackbarPos('Down', 'crop1')
     left_crop = cv2.getTrackbarPos('Left', 'crop1')
     right_crop = size[0] - cv2.getTrackbarPos('Right', 'crop1')
+    save_zone = cv2.getTrackbarPos('Save', 'crop1') // 2
+
+    medium_screen_line = size[0] // 2
 
     # Выстраиваем трапецию по координатам, полученных с бегунков.
-    polygon = np.float32([[size[0] // 2 - poly_down_width // 2, 720 - poly_down],
-                          [size[0] // 2 + poly_down_width // 2, 720 - poly_down],
-                          [size[0] // 2 + poly_up_width // 2, size[1] - poly_height],
-                          [size[0] // 2 - poly_up_width // 2, size[1] - poly_height]])
+    polygon = np.float32([[medium_screen_line - poly_down_width // 2, 720 - poly_down],
+                          [medium_screen_line + poly_down_width // 2, 720 - poly_down],
+                          [medium_screen_line + poly_up_width // 2, size[1] - poly_height],
+                          [medium_screen_line - poly_up_width // 2, size[1] - poly_height]])
     poly_draw = np.array(polygon, dtype=np.int32)
 
     # Формируем начальный и конечный цвет фильтра бинаризации изображения.
@@ -117,7 +126,6 @@ while cv2.waitKey(1) != 27:
     midpoint = histogram.shape[0] // 2
     IndWhitestCoulumnL = np.argmax(histogram[:midpoint])
     IndWhitestCoulumnR = np.argmax(histogram[midpoint:]) + midpoint
-
 
     nwindows, window_half = WC, WW
 
@@ -197,17 +205,26 @@ while cv2.waitKey(1) != 27:
     medium_line_x = (IndWhitestCoulumnL + IndWhitestCoulumnR) // 2
 
     # Средняя линия второй экран.
-    cv2.line(warped, (size[0] // 2, 0), (size[0] // 2, size[1]), 355, 2)
+    cv2.line(warped, (medium_screen_line, 0), (medium_screen_line, size[1]), 355, 2)
 
     redlineLen = 8  # от 1 до 10
     greenlineLen = 7
 
+    # Линии-Ограничители.
+    greenlineLen = int(size[1] // 10 * greenlineLen)
+    cv2.line(out_img, (medium_screen_line + save_zone, greenlineLen), (medium_screen_line + save_zone, size[1]),
+             (0, 255, 0), 2)
+    cv2.line(out_img, (medium_screen_line - save_zone, greenlineLen), (medium_screen_line - save_zone, size[1]),
+             (0, 255, 0), 2)
+
     # Средняя зелёная линия основной экран вывода.
-    cv2.line(out_img, (size[0] // 2, int(size[1] // 10 * greenlineLen)), (size[0] // 2, size[1]), (0, 255, 0), 3)
+    cv2.line(out_img, (medium_screen_line, greenlineLen), (medium_screen_line, size[1]), (0, 255, 0), 3)
 
     # Средняя линия полосы.
-    cv2.line(out_img, (medium_line_x, int(size[1] // 10 * redlineLen)), (medium_line_x, size[1]), (0, 0, 255), 4)
-    cv2.line(out_img, (size[0] // 2, int(size[1] // 10 * redlineLen)), (medium_line_x, int(size[1] // 10 * redlineLen)), (0, 0, 255), 4)
+    redlineLen = int(size[1] // 10 * redlineLen)
+
+    cv2.line(out_img, (medium_line_x, redlineLen), (medium_line_x, size[1]), (0, 0, 255), 4)
+    cv2.line(out_img, (medium_screen_line, redlineLen), (medium_line_x, redlineLen), (0, 0, 255), 4)
 
     # Варпим изображение основного экрана.
     out_img = cv2.warpPerspective(out_img, R, (size[1], size[0]), flags=cv2.INTER_LINEAR)
@@ -228,6 +245,14 @@ while cv2.waitKey(1) != 27:
 
     resized = cv2.resize(resized, (330, 330))
     warped = cv2.resize(warped, (330, 330))
+
+    # Логика поворотов.
+    if medium_line_x > medium_screen_line + save_zone:
+        output(f"WARN: Turn Right; Delta = {medium_line_x - medium_screen_line}", out_img, (0, 0, 255))
+    elif medium_line_x < medium_screen_line - save_zone:
+        output(f"WARN: Turn Left; Delta = {medium_line_x - medium_screen_line}", out_img, (0, 0, 255))
+    else:
+        output(f"Stat: Ok; Delta = {medium_line_x - medium_screen_line}", out_img, (0, 255, 0))
 
     # Выводим все экраны.
     cv2.imshow("result", out_img)
