@@ -1,22 +1,35 @@
+
+# Useful links
+# http://www.pygame.org/wiki/OBJFileLoader
+# https://rdmilligan.wordpress.com/2015/10/15/augmented-reality-using-opencv-opengl-and-blender/
+# https://clara.io/library
+
+# TODO -> Implement command line arguments (scale, model and object to be projected)
+#      -> Refactor and organize code (proper funcition definition and separation, classes, error handling...)
+
 import argparse
+
 import cv2
 import numpy as np
 import math
 import os
 from objloader_simple import *
 
-MIN_MATCHES = 5
+# Minimum number of matches that have to be found
+# to consider the recognition valid
+MIN_MATCHES = 10  
+
 
 def main():
     """
     This functions loads the target surface image,
     """
-    homography = None
-    # matrix of camera parameters (made up but works quite well for me)
+    homography = None 
+    # matrix of camera parameters (made up but works quite well for me) 
     camera_parameters = np.array([[800, 0, 320], [0, 800, 240], [0, 0, 1]])
     # create ORB keypoint detector
     orb = cv2.ORB_create()
-    # create BFMatcher object based on hamming distance
+    # create BFMatcher object based on hamming distance  
     bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
     # load the reference surface that will be searched in the video stream
     dir_name = os.getcwd()
@@ -24,7 +37,7 @@ def main():
     # Compute model keypoints and its descriptors
     kp_model, des_model = orb.detectAndCompute(model, None)
     # Load 3D model from OBJ file
-    obj = OBJ(os.path.join(dir_name, 'models/fox.obj'), swapyz=True)
+    obj = OBJ(os.path.join(dir_name, 'models/fox.obj'), swapyz=True)  
     # init video capture
     cap = cv2.VideoCapture(0)
 
@@ -32,8 +45,8 @@ def main():
         # read the current frame
         ret, frame = cap.read()
         if not ret:
-            print("Unable to capture video")
-            return
+            print "Unable to capture video"
+            return 
         # find and draw the keypoints of the frame
         kp_frame, des_frame = orb.detectAndCompute(frame, None)
         # match frame descriptors with model descriptors
@@ -55,13 +68,13 @@ def main():
                 pts = np.float32([[0, 0], [0, h - 1], [w - 1, h - 1], [w - 1, 0]]).reshape(-1, 1, 2)
                 # project corners into frame
                 dst = cv2.perspectiveTransform(pts, homography)
-                # connect them with lines
-                frame = cv2.polylines(frame, [np.int32(dst)], True, 255, 3, cv2.LINE_AA)
+                # connect them with lines  
+                frame = cv2.polylines(frame, [np.int32(dst)], True, 255, 3, cv2.LINE_AA)  
             # if a valid homography matrix was found render cube on model plane
             if homography is not None:
                 try:
                     # obtain 3D projection matrix from homography matrix and camera parameters
-                    projection = projection_matrix(camera_parameters, homography)
+                    projection = projection_matrix(camera_parameters, homography)  
                     # project cube or model
                     frame = render(frame, obj, projection, model, False)
                     #frame = render(frame, model, projection)
@@ -76,7 +89,7 @@ def main():
                 break
 
         else:
-            print("Not enough matches found - %d/%d" % (len(matches), MIN_MATCHES))
+            print "Not enough matches found - %d/%d" % (len(matches), MIN_MATCHES)
 
     cap.release()
     cv2.destroyAllWindows()

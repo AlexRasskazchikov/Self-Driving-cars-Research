@@ -4,58 +4,93 @@ import sys
 
 size = (720, 720)
 
-if __name__ == '__main__':
-    def nothing(*arg):
-        pass
+def nothing(*arg):
+    pass
 
-cap = cv2.VideoCapture(2)
+cam = 2
+path = "test_footage.mp4"
+
+frame_counter = 0
+
+video_name = path
+
+cap = cv2.VideoCapture(video_name)
 
 cv2.namedWindow("result")  # создаем главное окно  # создаем окно настроек
-cv2.namedWindow("setting2") # создаем окно настроек 2
-cv2.namedWindow("setting3")
+cv2.namedWindow("setting2")  # создаем окно настроек 1
+cv2.namedWindow("setting3")  # создаем окно настроек 2
+cv2.namedWindow("crop1")  # создаем окно настроек 3
 
-
+# Threshold слайдеры.
 cv2.createTrackbar('h1', 'setting2', 0, 255, nothing)
 cv2.createTrackbar('s1', 'setting2', 0, 255, nothing)
 cv2.createTrackbar('v1', 'setting2', 155, 255, nothing)
 cv2.createTrackbar('h2', 'setting2', 199, 255, nothing)
 cv2.createTrackbar('s2', 'setting2', 49, 255, nothing)
 cv2.createTrackbar('v2', 'setting2', 255, 255, nothing)
-cv2.createTrackbar('1H', 'setting3', 291, 720, nothing)
-cv2.createTrackbar('1W', 'setting3', 178, 720, nothing)
-cv2.createTrackbar('2H', 'setting3', 138, 720, nothing)
-cv2.createTrackbar('2W', 'setting3', 577, 720, nothing)
 
+# Слайдеры, отвечающие за варп трапеции.
+cv2.createTrackbar('1H', 'setting3', 291, 720, nothing)  # Высота верхнего основания.
+cv2.createTrackbar('1W', 'setting3', 178, 720, nothing)  # Ширина верхнего основания.
+cv2.createTrackbar('2H', 'setting3', 138, 720, nothing)  # Высота нижнего основания.
+cv2.createTrackbar('2W', 'setting3', 577, 720, nothing)  # Ширина нижнего основания.
+cv2.createTrackbar('WW', 'setting3', 30, 50, nothing)  # Ширина окошек слежения за полосой.
+cv2.createTrackbar('WC', 'setting3', 20, 50, nothing)  # Количество окошек слежения за полосой.
+
+# Crop-слайдеры.
+cv2.createTrackbar('Up', 'crop1', 5, size[1] // 2, nothing)
+cv2.createTrackbar('Down', 'crop1', 5, size[1] // 2, nothing)
+cv2.createTrackbar('Left', 'crop1', 5, size[0] // 2, nothing)
+cv2.createTrackbar('Right', 'crop1', 5, size[0] // 2, nothing)
 
 crange = [0, 0, 0, 0, 0, 0]
 
-t_height = 350
-
+# Координаты для варпа трапеции, углы картинки.
 dst = np.float32([[0, size[0]], [size[1], size[0]], [size[1], 0], [0, 0]])
 
 if not cap.isOpened():
     raise FileNotFoundError("Путь указан неверно.")
 
 while cv2.waitKey(1) != 27:
+
+    frame_counter += 1
+
+    if frame_counter == cap.get(cv2.CAP_PROP_FRAME_COUNT):
+        frame_counter = 0
+        cap = cv2.VideoCapture(video_name)
+
+
     # считываем значения бегунков
+
+    #   Threshold слайдеры.
     h1 = cv2.getTrackbarPos('h1', 'setting2')
     s1 = cv2.getTrackbarPos('s1', 'setting2')
     v1 = cv2.getTrackbarPos('v1', 'setting2')
     h2 = cv2.getTrackbarPos('h2', 'setting2')
     s2 = cv2.getTrackbarPos('s2', 'setting2')
     v2 = cv2.getTrackbarPos('v2', 'setting2')
-    poly_height = cv2.getTrackbarPos('1H', 'setting3')
-    poly_down = cv2.getTrackbarPos('2H', 'setting3')
-    poly_up_width = cv2.getTrackbarPos('1W', 'setting3')
-    poly_down_width = cv2.getTrackbarPos('2W', 'setting3')
 
+    #   Слайдеры, отвечающие за варп трапеции.
+    poly_height, poly_down = cv2.getTrackbarPos('1H', 'setting3'), cv2.getTrackbarPos('2H', 'setting3')
+    poly_up_width, poly_down_width = cv2.getTrackbarPos('1W', 'setting3'), cv2.getTrackbarPos('2W', 'setting3')
+
+    #   Слайдеры, отвечающие за настройку окошек слежения.
+    WC, WW = cv2.getTrackbarPos('WC', 'setting3'), cv2.getTrackbarPos('WW', 'setting3')
+
+    #   Слайдеры, отвечающие за кроп.
+    up_crop = cv2.getTrackbarPos('Up', 'crop1')
+    down_crop = size[1] - cv2.getTrackbarPos('Down', 'crop1')
+    left_crop = cv2.getTrackbarPos('Left', 'crop1')
+    right_crop = size[0] - cv2.getTrackbarPos('Right', 'crop1')
+
+    # Выстраиваем трапецию по координатам, полученных с бегунков.
     polygon = np.float32([[size[0] // 2 - poly_down_width // 2, 720 - poly_down],
                           [size[0] // 2 + poly_down_width // 2, 720 - poly_down],
                           [size[0] // 2 + poly_up_width // 2, size[1] - poly_height],
                           [size[0] // 2 - poly_up_width // 2, size[1] - poly_height]])
     poly_draw = np.array(polygon, dtype=np.int32)
 
-    # формируем начальный и конечный цвет фильтра
+    # Формируем начальный и конечный цвет фильтра бинаризации изображения.
     h_min, h_max = np.array((h1, s1, v1), np.uint8), np.array((h2, s2, v2), np.uint8)
 
     # Читаем камеру.
@@ -73,17 +108,22 @@ while cv2.waitKey(1) != 27:
     hsv = cv2.cvtColor(resized, cv2.COLOR_BGR2HSV)
     allBinary = cv2.inRange(hsv, h_min, h_max)
 
-
+    # Варпим изображение.
     M = cv2.getPerspectiveTransform(polygon, dst)
     warped = cv2.warpPerspective(allBinary, M, (size[1], size[0]), flags=cv2.INTER_LINEAR)
     histogram = np.sum(warped[warped.shape[0] // 2:, :], axis=0)
 
+    # Получаем самые белые столбцы полученного изображения.
     midpoint = histogram.shape[0] // 2
     IndWhitestCoulumnL = np.argmax(histogram[:midpoint])
     IndWhitestCoulumnR = np.argmax(histogram[midpoint:]) + midpoint
-    warped_visual = warped.copy()
 
-    nwindows, window_half = 20, 30
+
+    nwindows, window_half = WC, WW
+
+    if nwindows == 0:
+        nwindows = 1
+
     win_height = np.int(warped.shape[0] / nwindows)
 
     XCenterLeftWindow = IndWhitestCoulumnL
@@ -148,12 +188,48 @@ while cv2.waitKey(1) != 27:
         cv2.circle(out_img, (int(gor_ind), int(ver_ind)), 2, (255, 0, 255), 1)"""
 
     R = cv2.getPerspectiveTransform(dst, polygon)
-    cv2.line(warped, (IndWhitestCoulumnL, 0), (IndWhitestCoulumnL, warped_visual.shape[0]), 355, 3)
-    cv2.line(warped, (IndWhitestCoulumnR, 0), (IndWhitestCoulumnR, warped_visual.shape[0]), 235, 3)
+
+    # Рисуем линии опредёленных полос на бинаризированном изображении.
+    cv2.line(warped, (IndWhitestCoulumnL, 0), (IndWhitestCoulumnL, warped.shape[0]), 355, 3)
+    cv2.line(warped, (IndWhitestCoulumnR, 0), (IndWhitestCoulumnR, warped.shape[0]), 355, 3)
+
+    # Высчитываем Координату X центра полосы.
+    medium_line_x = (IndWhitestCoulumnL + IndWhitestCoulumnR) // 2
+
+    # Средняя линия второй экран.
+    cv2.line(warped, (size[0] // 2, 0), (size[0] // 2, size[1]), 355, 2)
+
+    redlineLen = 8  # от 1 до 10
+    greenlineLen = 7
+
+    # Средняя зелёная линия основной экран вывода.
+    cv2.line(out_img, (size[0] // 2, int(size[1] // 10 * greenlineLen)), (size[0] // 2, size[1]), (0, 255, 0), 3)
+
+    # Средняя линия полосы.
+    cv2.line(out_img, (medium_line_x, int(size[1] // 10 * redlineLen)), (medium_line_x, size[1]), (0, 0, 255), 4)
+    cv2.line(out_img, (size[0] // 2, int(size[1] // 10 * redlineLen)), (medium_line_x, int(size[1] // 10 * redlineLen)), (0, 0, 255), 4)
+
+    # Варпим изображение основного экрана.
     out_img = cv2.warpPerspective(out_img, R, (size[1], size[0]), flags=cv2.INTER_LINEAR)
-    out_img = cv2.resize(out_img, (330, 330))
+
+    # Меняем размеры экранов.
+    if up_crop == 0:
+        up_crop = 1
+    if left_crop == 0:
+        left_crop = 1
+    if down_crop == 0:
+        down_crop = 1
+    if up_crop == 0:
+        up_crop = 1
+
+    refPoint = [(left_crop, up_crop), (right_crop, down_crop)]
+
+    out_img = out_img[up_crop:down_crop, left_crop:right_crop]
+
     resized = cv2.resize(resized, (330, 330))
     warped = cv2.resize(warped, (330, 330))
+
+    # Выводим все экраны.
     cv2.imshow("result", out_img)
     cv2.imshow("standart", resized)
     cv2.imshow("warped", warped)
